@@ -215,10 +215,12 @@ except ValueError as e:
 class ChatRequest(BaseModel):
     url: HttpUrl
     message: str
+    debug: bool = False
 
 class ChatResponse(BaseModel):
     response: str
     website_id: str
+    debug_info: dict = None
 
 # API endpoint
 @app.post("/api/chat", response_model=ChatResponse)
@@ -228,9 +230,27 @@ async def chat_endpoint(request: ChatRequest):
     
     - **url**: The full URL of the website to chat with.
     - **message**: The user's message or question.
+    - **debug**: Set to true to include debugging information.
     """
+    debug_info = {}
     try:
         url_str = str(request.url)
+        
+        # Add debugging info
+        if request.debug:
+            # Attempt to scrape and return information about what was found
+            try:
+                documents = await rag_system.scrape_website(url_str)
+                debug_info["scrape_success"] = True
+                debug_info["documents_found"] = len(documents)
+                if documents:
+                    debug_info["first_doc_preview"] = documents[0].text[:200] + "..."
+                else:
+                    debug_info["scrape_error"] = "No documents found"
+            except Exception as e:
+                debug_info["scrape_success"] = False
+                debug_info["scrape_error"] = str(e)
+        
         response_text = await rag_system.chat_with_website(url_str, request.message)
         
         # Get website ID for response
@@ -238,16 +258,35 @@ async def chat_endpoint(request: ChatRequest):
         base_url = f"{parsed.scheme}://{parsed.netloc}"
         website_id = hashlib.md5(base_url.encode()).hexdigest()
         
-        return ChatResponse(response=response_text, website_id=website_id)
+        return ChatResponse(
+            response=response_text, 
+            website_id=website_id,
+            debug_info=debug_info if request.debug else None
+        )
         
     except ValueError as e:
+        if request.debug:
+            debug_info["error_type"] = "ValueError"
+            debug_info["error_details"] = str(e)
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
+        if request.debug:
+            debug_info["error_type"] = "RuntimeError"
+            debug_info["error_details"] = str(e)
         print(f"Runtime Error: {e}")
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail={"message": f"Internal Server Error: {str(e)}", "debug": debug_info if request.debug else None}
+        )
     except Exception as e:
+        if request.debug:
+            debug_info["error_type"] = "Exception"
+            debug_info["error_details"] = str(e)
         print(f"Unexpected Error: {e}")
-        raise HTTPException(status_code=500, detail="An unexpected internal error occurred.")
+        raise HTTPException(
+            status_code=500, 
+            detail={"message": "An unexpected internal error occurred.", "debug": debug_info if request.debug else None}
+        )
 
 @app.get("/api")
 async def root():

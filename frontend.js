@@ -1,13 +1,19 @@
 (function() {
     // Prevent double injection
-    if (window.__myChatBotLoaded) return;
+    if (window.__myChatBotLoaded) {
+      console.log("Chat bot already loaded. Skipping initialization.");
+      return;
+    }
     window.__myChatBotLoaded = true;
+    
+    console.log("Website Chat Bot loading...");
   
     // --- Configuration --- (Easy to customize)
     const config = {
       botName: 'Website Chat Assistant',
       welcomeMessage: 'Hello! I can answer questions about this website. What would you like to know?',
       apiEndpoint: 'https://chatwithwebsite-lyart.vercel.app/api/chat',
+      debug: true, // Enable debug mode
       // Colors (Feel free to change these)
       primaryColor: '#007AFF', // A modern blue
       headerGradient: 'linear-gradient(135deg, #007AFF, #0056b3)', // Header gradient
@@ -358,6 +364,7 @@
     // Get bot reply from the API
     async function getBotReply(userText) {
         const currentUrl = window.location.href;
+        console.log(`Sending request to ${config.apiEndpoint} for website: ${currentUrl}`);
         
         try {
             const response = await fetch(config.apiEndpoint, {
@@ -367,7 +374,8 @@
                 },
                 body: JSON.stringify({
                     url: currentUrl,
-                    message: userText
+                    message: userText,
+                    debug: config.debug
                 })
             });
             
@@ -376,10 +384,17 @@
             }
             
             const data = await response.json();
+            console.log("API response:", data);
+            
+            // Log debug info if available
+            if (data.debug_info) {
+                console.log("Debug info:", data.debug_info);
+            }
+            
             return data.response;
         } catch (error) {
             console.error("Error calling chat API:", error);
-            return "Sorry, I encountered an error while processing your request. Please try again later.";
+            return "Sorry, I encountered an error while processing your request. The API might be experiencing issues. Please try again later.";
         }
     }
   
@@ -413,5 +428,7 @@
         handleSend();
       }
     });
+    
+    console.log(`Website Chat Bot loaded successfully for ${window.location.href}`);
   
   })();
