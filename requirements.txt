@@ -1,0 +1,10 @@
+fastapi>=0.95.0
+uvicorn>=0.22.0
+pydantic>=1.10.7
+selenium>=4.9.0
+webdriver-manager==3.8.5
+llama-index-core>=0.8.0
+llama-index-llms-openai>=0.1.0
+llama-index-embeddings-openai>=0.1.0
+openai>=1.0.0
+python-dotenv>=1.0.0 
