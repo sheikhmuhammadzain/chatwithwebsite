@@ -5,8 +5,9 @@
   
     // --- Configuration --- (Easy to customize)
     const config = {
-      botName: 'Support Assistant',
-      welcomeMessage: 'Hello! How can I help you today?',
+      botName: 'Website Chat Assistant',
+      welcomeMessage: 'Hello! I can answer questions about this website. What would you like to know?',
+      apiEndpoint: 'https://chatwithwebsite-lyart.vercel.app/api/chat',
       // Colors (Feel free to change these)
       primaryColor: '#007AFF', // A modern blue
       headerGradient: 'linear-gradient(135deg, #007AFF, #0056b3)', // Header gradient
@@ -145,6 +146,47 @@
         color: var(--cb-bot-text-color);
         border-bottom-left-radius: 5px; /* Slightly different radius for bot */
       }
+
+      /* Typing indicator */
+      .typing-indicator {
+        padding: 10px 15px;
+        display: flex;
+        align-items: center;
+        background: var(--cb-bot-bubble-color);
+        border-radius: 18px;
+        border-bottom-left-radius: 5px;
+        max-width: 85%;
+        margin-bottom: 12px;
+      }
+      
+      .typing-indicator span {
+        height: 8px;
+        width: 8px;
+        float: left;
+        margin: 0 1px;
+        background-color: #9E9EA1;
+        display: block;
+        border-radius: 50%;
+        opacity: 0.4;
+      }
+      
+      .typing-indicator span:nth-of-type(1) {
+        animation: 1s blink infinite 0.3333s;
+      }
+      
+      .typing-indicator span:nth-of-type(2) {
+        animation: 1s blink infinite 0.6666s;
+      }
+      
+      .typing-indicator span:nth-of-type(3) {
+        animation: 1s blink infinite 0.9999s;
+      }
+      
+      @keyframes blink {
+        50% {
+          opacity: 1;
+        }
+      }
   
       #chatbot-input-container { /* Renamed for clarity */
         display: flex;
@@ -228,7 +270,7 @@
   
     container.innerHTML = `
       <div id="chatbot-header">
-          ${botIconSVG} <!-- Add bot icon to header -->
+          ${botIconSVG}
           <span>${config.botName}</span>
       </div>
       <div id="chatbot-messages"></div>
@@ -246,13 +288,20 @@
     const inputField = container.querySelector('#chatbot-input-container input');
     const sendButton = container.querySelector('#chatbot-send-button');
   
+    // Function to append a message to the chat
     function appendMessage(text, from = 'user') {
       const messageWrapper = document.createElement('div');
       messageWrapper.classList.add('chatbot-message', from); // 'user' or 'bot'
   
       const messageBubble = document.createElement('div');
       messageBubble.classList.add('message-bubble');
-      messageBubble.textContent = text; // Use textContent for security
+      
+      // Allow HTML in bot messages for formatting
+      if (from === 'bot') {
+        messageBubble.innerHTML = text;
+      } else {
+        messageBubble.textContent = text; // Plain text for user messages
+      }
   
       messageWrapper.appendChild(messageBubble);
       messagesContainer.appendChild(messageWrapper);
@@ -270,38 +319,68 @@
   
   
     // --- Bot Logic ---
+    let typingIndicator = null;
+    
     function showTypingIndicator() {
-        // Optional: Add a typing indicator element
-        // For now, just disable input
+        // Create typing indicator if it doesn't exist
+        if (!typingIndicator) {
+            typingIndicator = document.createElement('div');
+            typingIndicator.className = 'typing-indicator';
+            typingIndicator.innerHTML = '<span></span><span></span><span></span>';
+            
+            const wrapper = document.createElement('div');
+            wrapper.className = 'chatbot-message bot';
+            wrapper.appendChild(typingIndicator);
+            
+            messagesContainer.appendChild(wrapper);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        // Disable input while typing
         inputField.disabled = true;
         sendButton.disabled = true;
     }
   
     function hideTypingIndicator() {
+       if (typingIndicator) {
+           const wrapper = typingIndicator.parentNode;
+           if (wrapper) {
+               messagesContainer.removeChild(wrapper);
+           }
+           typingIndicator = null;
+       }
+       
        inputField.disabled = false;
        sendButton.disabled = false;
        inputField.focus(); // Return focus to input
     }
   
-    function getBotReply(userText) {
-        // Simple echo bot - replace with your actual bot logic
-        // You could make an API call here
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                // Basic logic examples:
-                let response = `You said: "${userText}"`;
-                const lowerText = userText.toLowerCase();
-  
-                if (lowerText.includes('hello') || lowerText.includes('hi')) {
-                    response = "Hello there! How can I assist you?";
-                } else if (lowerText.includes('help')) {
-                    response = "Sure, I can help. What do you need assistance with?";
-                } else if (lowerText.includes('bye')) {
-                    response = "Goodbye! Have a great day.";
-                }
-                resolve(response);
-            }, 800 + Math.random() * 500); // Simulate thinking time
-        });
+    // Get bot reply from the API
+    async function getBotReply(userText) {
+        const currentUrl = window.location.href;
+        
+        try {
+            const response = await fetch(config.apiEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    url: currentUrl,
+                    message: userText
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status} ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            return data.response;
+        } catch (error) {
+            console.error("Error calling chat API:", error);
+            return "Sorry, I encountered an error while processing your request. Please try again later.";
+        }
     }
   
     async function handleSend() {
@@ -315,12 +394,12 @@
   
       try {
           const botResponse = await getBotReply(text);
+          hideTypingIndicator();
           appendMessage(botResponse, 'bot');
       } catch (error) {
           console.error("Bot Error:", error);
-          appendMessage("Sorry, I encountered an error. Please try again.", 'bot');
-      } finally {
           hideTypingIndicator();
+          appendMessage("Sorry, I encountered an error. Please try again.", 'bot');
       }
     }
   

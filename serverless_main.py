@@ -5,6 +5,7 @@ from typing import Dict
 from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl
 
 import httpx
@@ -192,6 +193,15 @@ app = FastAPI(
     title="Serverless Website RAG Chat API",
     description="API to chat with websites using Retrieval-Augmented Generation.",
     version="1.0.0"
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
 )
 
 # Initialize RAG system
